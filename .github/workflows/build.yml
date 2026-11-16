@@ -1,0 +1,39 @@
+
+name: Build RustNetMod
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Extract project
+        shell: pwsh
+        run: |
+          Expand-Archive -Path "RustNetMod-WindowsBuild.zip" -DestinationPath "$env:RUNNER_TEMP\project" -Force
+          $p = "$env:RUNNER_TEMP\project\RustNetMod-WindowsBuild"
+          if (!(Test-Path "$p\build-netmod.ps1")) { throw "Project not found" }
+          foreach ($n in @("Survivalcraft.dll","Engine.dll","EntitySystem.dll")) {
+            if (!(Test-Path "build-libs\$n")) { throw "Missing build-libs\$n" }
+            Copy-Item "build-libs\$n" "$p\build-libs\$n"
+          }
+          "PROJECT=$p" >> $env:GITHUB_ENV
+
+      - name: Build
+        shell: pwsh
+        run: |
+          & "$env:PROJECT\build-netmod.ps1"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RustNetMod-netmod
+          path: ${{ runner.temp }}/project/RustNetMod-WindowsBuild/artifacts/RustNetMod.netmod
